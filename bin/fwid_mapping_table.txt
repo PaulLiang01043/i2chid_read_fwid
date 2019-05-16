@@ -1,0 +1,4 @@
+manufacturer.product,chrome_fwid,windows_fwid,
+0dae.e914,2a03,30e4,
+abcd.efgh,0123,4567,
+
