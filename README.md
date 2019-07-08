@@ -27,3 +27,11 @@ ex:
 
     ./i2chid_read_fwid -P 2a03 -f /tmp/fwid_mapping_table.txt -s windows
 
+Enable Silent Mode :
+    ./i2chid_read_fwid -P {hid_pid} -f {fwid_mapping_table_file} -s {system} -q
+
+ex:
+    ./i2chid_read_fwid -P 2a03 -f /tmp/fwid_mapping_table.txt -s chrome -q
+
+    ./i2chid_read_fwid -P 2a03 -f /tmp/fwid_mapping_table.txt -s windows -q
+

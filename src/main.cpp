@@ -30,7 +30,7 @@
 
 // SW Version
 #ifndef ELAN_TOOL_SW_VERSION
-#define	ELAN_TOOL_SW_VERSION	"0.1"
+#define	ELAN_TOOL_SW_VERSION	"0.2"
 #endif //ELAN_TOOL_SW_VERSION
 
 // File Length
@@ -148,20 +148,24 @@ unsigned short g_manufacturer_code = 0,
 // System Type
 system_type g_system_type = UNKNOWN;
 
+// Silent Mode (Quiet)
+bool g_quiet = false;
+
 // Help Info.
 bool g_help = false;
 
 // Parameter Option Settings
-const char* const short_options = "p:P:f:s:idh";
+const char* const short_options = "p:P:f:s:iqdh";
 const struct option long_options[] =
 {
-	{ "pid",					1, NULL, 'p'},
-	{ "pid_hex",				1, NULL, 'P'},
-	{ "mapping_file_path",		1, NULL, 'f'},
-	{ "system",					1, NULL, 's'},
-	{ "dev_info",				0, NULL, 'i'},
-    { "debug",					0, NULL, 'd'},
-	{ "help",					0, NULL, 'h'},
+	{ "pid",				1, NULL, 'p'},
+	{ "pid_hex",			1, NULL, 'P'},
+	{ "mapping_file_path",	1, NULL, 'f'},
+	{ "system",				1, NULL, 's'},
+	{ "dev_info",			0, NULL, 'i'},
+	{ "quiet",				0, NULL, 'q'},
+	{ "debug",				0, NULL, 'd'},
+	{ "help",				0, NULL, 'h'},
 };
 
 /*******************************************
@@ -173,7 +177,7 @@ const char *bus_str(int bus);
 int get_hid_dev_info(struct hidraw_devinfo *p_hid_dev_info, size_t dev_info_size);
 
 // Validate Elan Device
-int validate_elan_hid_device(struct hidraw_devinfo *p_hid_dev_info, size_t dev_info_size, int pid);
+int validate_elan_hid_device(struct hidraw_devinfo *p_hid_dev_info, size_t dev_info_size, int pid, bool quiet);
 
 // EDID Info.
 int get_edid_manufacturer_product_code(unsigned short *p_manufacturer_code, unsigned short *p_product_code);
@@ -185,7 +189,7 @@ int show_lcm_dev_info(struct lcm_dev_info *p_dev_info, size_t dev_info_size);
 
 // FWID
 int get_fwid(struct lcm_dev_info *p_dev_info, size_t dev_info_size, unsigned short manufacturer_code, unsigned short product_code, system_type system, unsigned short *p_fwid);
-int show_fwid(system_type system, unsigned short fwid);
+int show_fwid(system_type system, unsigned short fwid, bool quiet);
 
 // Help
 void show_help_information(void);
@@ -344,7 +348,7 @@ SHOW_HID_DEV_INFO_EXIT:
 	return err;
 }
 
-int validate_elan_hid_device(struct hidraw_devinfo *p_hid_dev_info, size_t dev_info_size, int pid)
+int validate_elan_hid_device(struct hidraw_devinfo *p_hid_dev_info, size_t dev_info_size, int pid, bool quiet)
 {
 	int err = TP_SUCCESS,
 		index = 0;
@@ -358,7 +362,8 @@ int validate_elan_hid_device(struct hidraw_devinfo *p_hid_dev_info, size_t dev_i
         goto VALIDATE_ELAN_HID_DEVICE_EXIT;
     }
 
-	printf("--------------------------------------\r\n");
+	if(quiet == false) // Normal Mode
+		printf("--------------------------------------\r\n");
 
 	// Compare all hidraw device info. with VID/PID
 	for(index = 0; index < DEV_INFO_SET_MAX; index++)
@@ -372,14 +377,18 @@ int validate_elan_hid_device(struct hidraw_devinfo *p_hid_dev_info, size_t dev_i
 		   (p_hid_dev_info[index].vendor == ELAN_USB_VID) && \
 		   ((p_hid_dev_info[index].product == pid) || (p_hid_dev_info[index].product == ELAN_USB_RECOVERY_PID)))
 		{
-			printf("Device exists! (VID: %04x, PID: %04x)\r\n", p_hid_dev_info[index].vendor, p_hid_dev_info[index].product);
+			if(quiet == false) // Normal Mode
+				printf("Device exists! (VID: %04x, PID: %04x)\r\n", p_hid_dev_info[index].vendor, p_hid_dev_info[index].product);
 			dev_exist = true;
 			break;
 		}
 	}
 
 	if(dev_exist == false)
-		printf("Device does not exist! (VID: %04x, PID: %04x)\r\n", p_hid_dev_info[index].vendor, p_hid_dev_info[index].product);
+	{
+		if(quiet == false) // Normal Mode
+			printf("Device does not exist! (VID: %04x, PID: %04x)\r\n", p_hid_dev_info[index].vendor, p_hid_dev_info[index].product);
+	}
 
 	// Success
 	err = TP_SUCCESS;
@@ -626,7 +635,7 @@ GET_FWID_EXIT:
 	return err;
 }
 
-int show_fwid(system_type system, unsigned short fwid)
+int show_fwid(system_type system, unsigned short fwid, bool quiet)
 {
 	int err = TP_SUCCESS;
 
@@ -638,9 +647,16 @@ int show_fwid(system_type system, unsigned short fwid)
         goto SHOW_FWID_EXIT;
     }
 
-	printf("--------------------------------------\r\n");
-	printf("System: %s.\r\n", (system == CHROME) ? "Chrome" : "Windows");
-	printf("FWID: %04x.\r\n", fwid);
+	if(quiet == true)
+	{
+		printf("%04x", fwid);
+	}
+	else //if(quiet == false)
+	{
+		printf("--------------------------------------\r\n");
+		printf("System: %s.\r\n", (system == CHROME) ? "Chrome" : "Windows");
+		printf("FWID: %04x.\r\n", fwid);
+	}
 
 SHOW_FWID_EXIT:
 	return err;
@@ -679,10 +695,15 @@ void show_help_information(void)
 	printf("-i.\r\n");
 	printf("Ex: i2chid_read_fwid -i\r\n");
 
+	// Silent (Quiet) Mode
+	printf("\n[Silent Mode]\r\n");
+	printf("-q.\r\n");
+	printf("Ex: i2chid_read_fwid -q\r\n");
+
 	// Debug Information
 	printf("\n[Debug]\r\n");
 	printf("-d.\r\n");
-	printf("Ex: i2chid_read_fwidp -d\r\n");
+	printf("Ex: i2chid_read_fwid -d\r\n");
 
 	// Help Information
 	printf("\n[Help]\r\n");
@@ -939,6 +960,13 @@ int process_parameter(int argc, char **argv)
                 DEBUG_PRINTF("%s: Get Device Inforamtion: %s.\r\n", __func__, (g_dev_info) ? "Enable" : "Disable");
                 break;
 
+			case 'q': /* Silent Mode (Quiet) */
+
+                // Enable Silent Mode (Quiet)
+                g_quiet = true;
+                DEBUG_PRINTF("%s: Silent Mode: %s.\r\n", __func__, (g_quiet) ? "Enable" : "Disable");
+                break;
+
             case 'd': /* Debug Option */
 
                 // Set debug
@@ -987,14 +1015,15 @@ PROCESS_PARAM_EXIT:
 int main(int argc, char **argv)
 {
     int err = TP_SUCCESS;
-	unsigned short fwid = 0;
-
-    printf("i2chid_read_fwid v%s.\r\n", ELAN_TOOL_SW_VERSION);
+    unsigned short fwid = 0;
 
 	/* Process Parameter */
 	err = process_parameter(argc, argv);
     if (err != TP_SUCCESS)
         goto EXIT;
+
+	if(g_quiet == false) // Normal Mode
+		printf("i2chid_read_fwid v%s.\r\n", ELAN_TOOL_SW_VERSION);
 
 	/* Show Help Information */
 	if(g_help == true)
@@ -1036,7 +1065,7 @@ int main(int argc, char **argv)
 	if(g_validate_dev == true)
 	{
 		/* Validate Elan Touchsceen Device */
-		err = validate_elan_hid_device(g_hid_dev_info, sizeof(g_hid_dev_info), g_pid);
+		err = validate_elan_hid_device(g_hid_dev_info, sizeof(g_hid_dev_info), g_pid, g_quiet);
 		if (err != TP_SUCCESS)
 		{
 			ERROR_PRINTF("%s: Fail to validate elan HID Device (PID: %04x)! errno=0x%x.\r\n", __func__, g_pid, err);
@@ -1055,7 +1084,7 @@ int main(int argc, char **argv)
 		}
 
 		/* Show FWID */
-		err = show_fwid(g_system_type, fwid);
+		err = show_fwid(g_system_type, fwid, g_quiet);
 		if (err != TP_SUCCESS)
 		{
 			ERROR_PRINTF("%s: Fail to show %s FWID! errno=0x%x.\r\n", __func__, (g_system_type == CHROME) ? "chrome" : "windows", err);
