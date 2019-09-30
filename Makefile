@@ -4,20 +4,15 @@
 #
 program := i2chid_read_fwid
 objects := main.o
-libraries := rt pthread
+libraries := stdc++ rt pthread
 executable_path := ./bin
 source_path := ./src
 include_path := ./include 
 
-CC = g++ # Compiler: GCC C++ Compiler
-#CC = arm-none-linux-gnueabi-g++ # Compiler: arm Cross Compiler 
-CFLAGS = -Wall -ansi -O3 -g
-CFLAGS += -D__ENABLE_DEBUG__
-CFLAGS += -D__ENABLE_INBUF_DEBUG__
-CFLAGS += -D__SUPPORT_ENGAP_FORMAT__
-CFLAGS += -D__USE_EKTH3900__
-CFLAGS += -D__SUPPORT_POWER_CONFIG__
-CFLAGS += -static
+CXX ?= g++ # Compiler: GCC C++ Compiler
+#CXX ?= arm-none-linux-gnueabi-g++ # Compiler: arm Cross Compiler 
+CXXFLAGS = -Wall -ansi -O3 -g
+CXXFLAGS += -static
 INC_FLAGS += $(addprefix -I, $(include_path))
 LIB_FLAGS += $(addprefix -l, $(libraries))
 VPATH = $(include_path)
@@ -28,13 +23,13 @@ vpath %.cpp $(source_path)
 
 .PHONY: all
 all: $(objects)
-	$(CC) $^ $(CFLAGS) $(INC_FLAGS) $(LIB_FLAGS) -o $(program)
+	$(CXX) $^ $(CXXFLAGS) $(INC_FLAGS) $(LIB_FLAGS) -o $(program)
 	@chmod 777 $(program)
 	@mv $(program) $(executable_path)
 	@rm -rf $^
 	
 %.o: %.cpp
-	$(CC) -c $< $(CFLAGS) $(INC_FLAGS) $(LIB_FLAGS)
+	$(CXX) -c $< $(CXXFLAGS) $(INC_FLAGS) $(LIB_FLAGS)
 	
 .PHONY: clean
 clean: 
