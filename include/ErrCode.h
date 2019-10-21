@@ -9,20 +9,22 @@
 #ifndef TP_SUCCESS
 #define TP_SUCCESS							0x0000
 #endif
+
 /** This function is not support. **/
 #ifndef TP_ERR_COMMAND_NOT_SUPPORT
 #define TP_ERR_COMMAND_NOT_SUPPORT  		0x0001
 #endif
+
 /** The touch ic may be occupied by other application **/
 #ifndef TP_ERR_DEVICE_BUSY
 #define TP_ERR_DEVICE_BUSY					0x0002
 #endif
-//J2++
+
 /** Read/Write data timeout **/
 #ifndef TP_ERR_TIMEOUT
 #define TP_ERR_TIMEOUT						0x0003
 #endif
-//J2--
+
 /** For asynchorous call, the execution is not finish yet. Waitting for complete **/
 #ifndef TP_ERR_IO_PENDING
 #define TP_ERR_IO_PENDING					0x0004
@@ -33,12 +35,10 @@
 #define TP_ERR_DATA_PATTERN					0x0005
 #endif
 
-//J2++
 /** No interface create **/
 #ifndef TP_ERR_NO_INTERFACE_CREATE
 #define TP_ERR_NO_INTERFACE_CREATE			0x0006
 #endif
-//J2--
 
 #ifndef TP_ERR_HID_NOT_SUPPORT
 #define TP_ERR_HID_NOT_SUPPORT				0x0007
@@ -62,9 +62,14 @@
 #define TP_ERR_NOT_FOUND_DEVICE				0x0104
 #endif
 
-/** Someting Like File or Directory Not Found  **/
+/** Something Like File or Directory Not Found  **/
 #ifndef TP_ERR_FILE_NOT_FOUND
 #define TP_ERR_FILE_NOT_FOUND				0x0105
+#endif //TP_ERR_FILE_NOT_FOUND
+
+/** Data Not Found  **/
+#ifndef TP_ERR_DATA_NOT_FOUND
+#define TP_ERR_DATA_NOT_FOUND				0x0106
 #endif //TP_ERR_FILE_NOT_FOUND
 
 /* Unknown Device Type */
@@ -106,6 +111,10 @@
 #ifndef ERR_SYSTEM_COMMAND_FAIL
 #define ERR_SYSTEM_COMMAND_FAIL				0x0701
 #endif //ERR_SYSTEM_COMMAND_FAIL
+
+#ifndef ERR_IN_RECOVERY_MODE
+#define ERR_IN_RECOVERY_MODE				0x0702
+#endif //ERR_IN_RECOVERY_MODE
 
 /** Error information check, use GetErrMsg to get the error message. **/
 #ifndef TP_ERR_CHK_MSG

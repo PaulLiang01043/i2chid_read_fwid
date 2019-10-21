@@ -23,6 +23,8 @@
 #include <linux/input.h>	/* BUS_TYPE */
 #include <linux/hidraw.h>	/* hidraw */
 #include "ErrCode.h"
+#include "I2CHIDLinuxGet.h"
+#include "ElanTsFuncUtility.h"
 
 /***************************************************
  * Definitions
@@ -30,7 +32,7 @@
 
 // SW Version
 #ifndef ELAN_TOOL_SW_VERSION
-#define	ELAN_TOOL_SW_VERSION	"0.3"
+#define	ELAN_TOOL_SW_VERSION	"0.4"
 #endif //ELAN_TOOL_SW_VERSION
 
 // File Length
@@ -74,9 +76,17 @@
 #endif //MODETEST_CMD
 
 // EDID Header
-#ifndef EDID_HEADER
-#define EDID_HEADER		"00ffffffffffff00"
-#endif //EDID_HEADER
+#ifndef STANDARD_EDID_HEADER
+#define STANDARD_EDID_HEADER		"00ffffffffffff00"
+#endif //STANDARD_EDID_HEADER
+
+#ifndef AUO_EDID_HEADER
+#define AUO_EDID_HEADER             "b36f0200b004ec04"
+#endif //AUO_EDID_HEADER
+
+#ifndef BOE_EDID_HEADER
+#define BOE_EDID_HEADER             "59700200b0042205"
+#endif //BOE_EDID_HEADER
 
 // System Name Length
 #ifndef SYSTEM_NAME_LENGTH
@@ -124,6 +134,9 @@ bool g_debug = false;
 #ifndef ERROR_PRINTF
 #define ERROR_PRINTF(fmt, argv...) fprintf(stderr, fmt, ##argv)
 #endif //ERROR_PRINTF
+
+// InterfaceGet Class
+CI2CHIDLinuxGet *g_pIntfGet = NULL;		// Pointer to I2CHID Inteface Class (CI2CHIDLinuxGet)
 
 // Validate Touchscreen Device
 bool g_validate_dev = false;
@@ -188,13 +201,23 @@ int parse_fwid_mapping_file(FILE *fd_mapping_file, struct lcm_dev_info *dev_info
 int show_lcm_dev_info(struct lcm_dev_info *p_dev_info, size_t dev_info_size);
 
 // FWID
-int get_fwid(struct lcm_dev_info *p_dev_info, size_t dev_info_size, unsigned short manufacturer_code, unsigned short product_code, system_type system, unsigned short *p_fwid);
+int get_fwid_from_edid(struct lcm_dev_info *p_dev_info, size_t dev_info_size, unsigned short manufacturer_code, unsigned short product_code, system_type system, unsigned short *p_fwid);
 int show_fwid(system_type system, unsigned short fwid, bool quiet);
+
+int get_fwid_from_rom(unsigned short *p_fwid);
+int show_fwid_from_rom(unsigned short fwid);
 
 // Help
 void show_help_information(void);
 
+// HID Raw I/O Function
+int __hidraw_write(unsigned char* buf, int len, int timeout_ms); 
+int __hidraw_read(unsigned char* buf, int len, int timeout_ms);
+
 // Abstract Device I/O Function
+int write_cmd(unsigned char *cmd_buf, int len, int timeout_ms);
+int read_data(unsigned char *data_buf, int len, int timeout_ms);
+int write_vendor_cmd(unsigned char *cmd_buf, int len, int timeout_ms);
 int open_device(void);
 int close_device(void);
 
@@ -204,10 +227,106 @@ int resource_init(void);
 int resource_free(void);
 int main(int argc, char **argv);
 
+/*******************************************
+ * HID Raw I/O Functions
+ ******************************************/
+
+int __hidraw_write(unsigned char* buf, int len, int timeout_ms)
+{
+	int nRet = TP_SUCCESS;
+
+	if(g_pIntfGet == NULL)
+	{
+		nRet = TP_ERR_COMMAND_NOT_SUPPORT;
+		goto __HIDRAW_WRITE_EXIT;
+	}
+
+	nRet = g_pIntfGet->WriteRawBytes(buf, len, timeout_ms);
+
+__HIDRAW_WRITE_EXIT:
+	return nRet;
+}
+
+int __hidraw_read(unsigned char* buf, int len, int timeout_ms)
+{
+	int nRet = TP_SUCCESS;
+
+	if(g_pIntfGet == NULL)
+	{
+		nRet = TP_ERR_COMMAND_NOT_SUPPORT;
+		goto __HIDRAW_READ_EXIT;
+	}
+
+	nRet = g_pIntfGet->ReadRawBytes(buf, len, timeout_ms);
+
+__HIDRAW_READ_EXIT:
+	return nRet;
+}
+
+int __hidraw_write_command(unsigned char* buf, int len, int timeout_ms)
+{
+	int nRet = TP_SUCCESS;
+
+	if(g_pIntfGet == NULL)
+	{
+		nRet = TP_ERR_COMMAND_NOT_SUPPORT;
+		goto __HIDRAW_WRITE_EXIT;
+	}
+
+	nRet = g_pIntfGet->WriteCommand(buf, len, timeout_ms);
+
+__HIDRAW_WRITE_EXIT:
+	return nRet;
+}
+
+int __hidraw_read_data(unsigned char* buf, int len, int timeout_ms)
+{
+	int nRet = TP_SUCCESS;
+
+	if(g_pIntfGet == NULL)
+	{
+		nRet = TP_ERR_COMMAND_NOT_SUPPORT;
+		goto __HIDRAW_READ_EXIT;
+	}
+
+	nRet = g_pIntfGet->ReadData(buf, len, timeout_ms);
+
+__HIDRAW_READ_EXIT:
+	return nRet;
+}
+
 /***************************************************
  * Abstract I/O Functions
  ***************************************************/
 
+int write_cmd(unsigned char *cmd_buf, int len, int timeout_ms)
+{
+    //write_bytes_from_buffer_to_i2c(cmd_buf); //pseudo function
+
+    /*** example *********************/
+    return __hidraw_write_command(cmd_buf, len, timeout_ms);
+    /*********************************/
+}
+
+int read_data(unsigned char *data_buf, int len, int timeout_ms)
+{
+    //read_bytes_from_i2c_to_buffer(data_buf, len, timeout); //pseudo function
+
+    /*** example *********************/
+    return __hidraw_read_data(data_buf, len, timeout_ms);
+    /*********************************/
+}
+
+int write_vendor_cmd(unsigned char *cmd_buf, int len, int timeout_ms)
+{
+	unsigned char vendor_cmd_buf[ELAN_I2CHID_OUTPUT_BUFFER_SIZE] = {0};
+
+	// Add HID Header
+	vendor_cmd_buf[0] = ELAN_HID_OUTPUT_REPORT_ID;
+	memcpy(&vendor_cmd_buf[1], cmd_buf, len);
+
+	return __hidraw_write(vendor_cmd_buf, sizeof(vendor_cmd_buf), timeout_ms);
+}
 
 /*******************************************
  * File I/O
@@ -430,16 +549,31 @@ int get_edid_manufacturer_product_code(unsigned short *p_manufacturer_code, unsi
 	{
 		//DEBUG_PRINTF("%s", buf);
 
-		// Search for EDID Header
-		p_edid_header = strstr(buf, EDID_HEADER);
+		/* Search for EDID Header */
+
+        // Pattern 1: Standard EDID Header
+		p_edid_header = strstr(buf, STANDARD_EDID_HEADER);
 		if(p_edid_header == NULL)
-			continue;
+        {
+            // Pattern 2: AUO EDID Header
+            p_edid_header = strstr(buf, AUO_EDID_HEADER);
+            if(p_edid_header == NULL)
+            {
+                // Pattern 3: BOE EDID Header
+                p_edid_header = strstr(buf, BOE_EDID_HEADER);
+                if(p_edid_header == NULL)
+                {
+                    // Not contain of known EDID Header, try to search next line
+                    continue;
+                }
+            }
+        }
 
 		// Line output with EDID Header 
 		DEBUG_PRINTF("%s: %s", __func__, buf);
 
 		// Manufacturer Code
-		p_edid_manufacturer_code = p_edid_header + strlen(EDID_HEADER);
+		p_edid_manufacturer_code = p_edid_header + strlen(STANDARD_EDID_HEADER);
 		strncpy(edid_manufacturer_code, p_edid_manufacturer_code, 4);
 		*p_manufacturer_code = strtol(edid_manufacturer_code, NULL, 16);
 		DEBUG_PRINTF("%s: manufacturer_code: %04x.\r\n", __func__, *p_manufacturer_code);
@@ -583,9 +717,9 @@ SHOW_LCM_DEV_INFO_EXIT:
 	return err;
 }
 
-int get_fwid(struct lcm_dev_info *p_dev_info, size_t dev_info_size, unsigned short manufacturer_code, unsigned short product_code, system_type system, unsigned short *p_fwid)
+int get_fwid_from_edid(struct lcm_dev_info *p_dev_info, size_t dev_info_size, unsigned short manufacturer_code, unsigned short product_code, system_type system, unsigned short *p_fwid)
 {
-	int err = TP_SUCCESS,
+	int err = TP_ERR_DATA_NOT_FOUND,
 		index = 0;
 	char target_panel_info[PANEL_INFO_LENGTH_MAX] = {0};
 
@@ -595,7 +729,7 @@ int get_fwid(struct lcm_dev_info *p_dev_info, size_t dev_info_size, unsigned sho
         ERROR_PRINTF("%s: Invalid Parameter! (p_dev_info=0x%p, dev_info_size=%zd, manufacturer_code=0x%x, product_code=0x%x, system=%d, p_fwid=0x%p)\r\n",
 							__func__, p_dev_info, dev_info_size, manufacturer_code, product_code, system, p_fwid);
         err = TP_ERR_INVALID_PARAM;
-        goto GET_FWID_EXIT;
+        goto GET_FWID_FROM_EDID_EXIT;
     }
 
 	// Set Target Panel Info.
@@ -615,23 +749,103 @@ int get_fwid(struct lcm_dev_info *p_dev_info, size_t dev_info_size, unsigned sho
 			if(system == CHROME)
 			{
 				DEBUG_PRINTF("%s: [Chrome] FWID: %04x.\r\n", __func__, p_dev_info[index].chrome_fwid);				
-				*p_fwid = p_dev_info[index].chrome_fwid;
-
-				// Found
+				if(p_dev_info[index].chrome_fwid == 0x0) // NULL FWID
+                {
+                    DEBUG_PRINTF("%s: NULL FWID.\r\n", __func__);
+                    err = TP_ERR_DATA_NOT_FOUND; // Not Found 
+                }
+                else // Valid FWID
+                {
+                    *p_fwid = p_dev_info[index].chrome_fwid;
+                    err = TP_SUCCESS; // Found
+                }
 				break;
 			}
 			else if (system == WINDOWS)
 			{
 				DEBUG_PRINTF("%s: [Windows] FWID: %04x.\r\n", __func__, p_dev_info[index].windows_fwid);
-				*p_fwid = p_dev_info[index].windows_fwid;
-
-				// Found
+                if(p_dev_info[index].windows_fwid == 0x0) // NULL FWID
+                {
+                    DEBUG_PRINTF("%s: NULL FWID.\r\n", __func__);
+                    err = TP_ERR_DATA_NOT_FOUND; // Not Found 
+                }
+                else // Valid FWID
+                {
+				    *p_fwid = p_dev_info[index].windows_fwid;
+                    err = TP_SUCCESS; // Found
+                }
 				break;
 			}
 		}
 	}
 
-GET_FWID_EXIT:
+GET_FWID_FROM_EDID_EXIT:
+	return err;
+}
+
+int get_fwid_from_rom(unsigned short *p_fwid)
+{
+	int err = TP_SUCCESS;
+    unsigned short fw_version = 0,
+                   fw_id = 0;
+    unsigned char  solution_id = 0;
+
+	// Check if Parameter Invalid
+    if (p_fwid == NULL)
+    {
+        ERROR_PRINTF("%s: Invalid Parameter! (p_fwid=0x%p)\r\n", __func__, p_fwid);
+        err = TP_ERR_INVALID_PARAM;
+        goto GET_FWID_FROM_ROM_EXIT;
+    }
+
+    /* Get Firmware Version */
+    err = send_fw_version_command();
+    if(err != TP_SUCCESS)
+    {
+        ERROR_PRINTF("%s: Fail to Send FW Version Command! errno=0x%x.\r\n", __func__, err);
+        goto GET_FWID_FROM_ROM_EXIT;
+    }
+
+    err = get_fw_version_data(&fw_version);
+    if(err != TP_SUCCESS)
+    {
+        ERROR_PRINTF("%s: Fail to Get FW Version Data! errno=0x%x.\r\n", __func__, err);
+        goto GET_FWID_FROM_ROM_EXIT;
+    }
+
+    // Get Solution ID
+    solution_id = (unsigned char)((fw_version & 0xFF00) >> 8);
+
+    // Read FWID from ROM
+    err = send_read_rom_data_command(ELAN_INFO_ROM_FWID_MEMORY_ADDR, solution_id);
+    if(err != TP_SUCCESS)
+    {
+        ERROR_PRINTF("%s: Fail to Send Read ROM Data Command! errno=0x%x.\r\n", __func__, err);
+        goto GET_FWID_FROM_ROM_EXIT;
+    }
+
+    err = receive_rom_data(&fw_id);
+    if(err != TP_SUCCESS)
+    {
+        ERROR_PRINTF("%s: Fail to Receive ROM Data! errno=0x%x.\r\n", __func__, err);
+        goto GET_FWID_FROM_ROM_EXIT;
+    }
+
+    *p_fwid = fw_id;
+    err = TP_SUCCESS;
+
+GET_FWID_FROM_ROM_EXIT:
+	return err; 
+}
+
+int show_fwid_from_rom(unsigned short fwid)
+{
+    int err = TP_SUCCESS;
+
+	printf("--------------------------------------\r\n");
+    printf("Information from ROM:\r\n");
+    printf("FWID: %04x.\r\n", fwid);    
+
 	return err;
 }
 
@@ -724,6 +938,10 @@ int open_device(void)
 
     /*** example *********************/
     // Connect to Device
+    DEBUG_PRINTF("Get I2C-HID Device Handle (VID=0x%x, PID=0x%x).\r\n", ELAN_USB_VID, g_pid);
+    err = g_pIntfGet->GetDeviceHandle(ELAN_USB_VID, g_pid);
+    if (err != TP_SUCCESS)
+        ERROR_PRINTF("Device can't connected! errno=0x%x.\n", err);
     /*********************************/
 
     return err;
@@ -737,6 +955,7 @@ int close_device(void)
 
     /*** example *********************/
     // Release acquired touch device handler
+    g_pIntfGet->Close();
     /*********************************/
 
     return err;
@@ -761,6 +980,16 @@ int resource_init(void)
 		ERROR_PRINTF("%s: Get HID Dev Info. Fail! errno=0x%x.\r\n", __func__, err);
 		goto RESOURCE_INIT_EXIT;
 	}
+
+    // Initialize I2C-HID Interface
+    g_pIntfGet = new CI2CHIDLinuxGet();
+    DEBUG_PRINTF("g_pIntfGet=%p.\n", g_pIntfGet);
+    if (g_pIntfGet == NULL)
+    {
+        ERROR_PRINTF("Fail to initialize I2C-HID Interface!");
+        err = TP_ERR_NO_INTERFACE_CREATE;
+		goto RESOURCE_INIT_EXIT;
+    }
 
 	// Initialize EDID Manufacturer Code / Product Code
 	err = get_edid_manufacturer_product_code(&g_manufacturer_code, &g_product_code);
@@ -810,6 +1039,11 @@ int resource_free(void)
 
     /*** example *********************/
     // Release Interface
+    if (g_pIntfGet)
+    {
+        delete dynamic_cast<CI2CHIDLinuxGet *>(g_pIntfGet);
+        g_pIntfGet = NULL;
+    }
 
 	// Close FWID Mapping File
     if (g_fd_fwid_mapping_file)
@@ -1015,7 +1249,8 @@ PROCESS_PARAM_EXIT:
 int main(int argc, char **argv)
 {
     int err = TP_SUCCESS;
-    unsigned short fwid = 0;
+    unsigned short fwid = 0,
+                   fwid_from_rom = 0;
 
 	/* Process Parameter */
 	err = process_parameter(argc, argv);
@@ -1036,6 +1271,22 @@ int main(int argc, char **argv)
 	err = resource_init();
     if (err != TP_SUCCESS)
         goto EXIT1;
+
+    /* Open Device */
+	err = open_device() ;
+    if (err != TP_SUCCESS)
+	{
+		ERROR_PRINTF("Fail to Open Device! errno=0x%x.\r\n", err);
+        goto EXIT2;
+	}
+
+    /* Get FWID from ROM */
+    err = get_fwid_from_rom(&fwid_from_rom);
+    if (err != TP_SUCCESS)
+	{
+		ERROR_PRINTF("Fail to Get FWID from ROM! errno=0x%x.\r\n", err);
+        goto EXIT2;
+	}
 
 	if(g_dev_info == true)
 	{
@@ -1060,6 +1311,9 @@ int main(int argc, char **argv)
         		goto EXIT1;
 			}
 		}
+
+        /* Show FWID from ROM */
+        show_fwid_from_rom(fwid_from_rom);
 	}
 
 	if(g_validate_dev == true)
@@ -1075,12 +1329,20 @@ int main(int argc, char **argv)
 
 	if(g_lookup_fwid == true)
 	{
-		/* Lookup FWID */
-		err = get_fwid(g_lcm_dev_info, sizeof(g_lcm_dev_info), g_manufacturer_code, g_product_code, g_system_type, &fwid);
+		/* Lookup FWID from EDID */
+		err = get_fwid_from_edid(g_lcm_dev_info, sizeof(g_lcm_dev_info), g_manufacturer_code, g_product_code, g_system_type, &fwid);
 		if (err != TP_SUCCESS)
 		{
-			ERROR_PRINTF("%s: Fail to get %s FWID! errno=0x%x.\r\n", __func__, (g_system_type == CHROME) ? "chrome" : "windows", err);
-        	goto EXIT1;
+            if (err == TP_ERR_DATA_NOT_FOUND)
+            {
+                DEBUG_PRINTF("fwid_from_edid Not Found, use fwid_from_rom (%x) instead.\r\n", fwid_from_rom);
+                fwid = fwid_from_rom;
+            }
+            else // if ((err != TP_SUCCESS) && (err != TP_ERR_DATA_NOT_FOUND))
+            {
+			    ERROR_PRINTF("%s: Fail to get %s FWID! errno=0x%x.\r\n", __func__, (g_system_type == CHROME) ? "chrome" : "windows", err);
+        	    goto EXIT1;
+            }
 		}
 
 		/* Show FWID */
@@ -1094,6 +1356,10 @@ int main(int argc, char **argv)
 
 	// Success
     err = TP_SUCCESS;
+
+EXIT2:
+    /* Close Device */
+    close_device();
 
 EXIT1:
 	/* Release Resource */

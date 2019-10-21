@@ -1,3 +1,5 @@
 manufacturer.product,chrome_fwid,windows_fwid,
 0dae.e914,30e4,2e3e,
 06af.3d31,2fca,2e36,
+2c05.5405,,,
+f004.4005,,,

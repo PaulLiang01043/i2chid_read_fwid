@@ -3,7 +3,10 @@
 # Date: 2019/05/06
 #
 program := i2chid_read_fwid
-objects := main.o
+objects := BaseLog.o \
+		   I2CHIDLinuxGet.o \
+		   ElanTsFuncUtility.o \
+		   main.o
 libraries := stdc++ rt pthread
 executable_path := ./bin
 source_path := ./src
@@ -12,6 +15,11 @@ include_path := ./include
 CXX ?= g++ # Compiler: GCC C++ Compiler
 #CXX ?= arm-none-linux-gnueabi-g++ # Compiler: arm Cross Compiler 
 CXXFLAGS = -Wall -ansi -O3 -g
+CXXFLAGS += -D__ENABLE_DEBUG__
+CXXFLAGS += -D__ENABLE_OUTBUF_DEBUG__
+CXXFLAGS += -D__ENABLE_INBUF_DEBUG__
+CXXFLAGS += -D__ENABLE_LOG_FILE_DEBUG__
+#CXXFLAGS += -D__ENABLE_SYSLOG_DEBUG__
 CXXFLAGS += -static
 INC_FLAGS += $(addprefix -I, $(include_path))
 LIB_FLAGS += $(addprefix -l, $(libraries))
