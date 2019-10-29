@@ -213,8 +213,8 @@ int send_exit_test_mode_command(void);
 int send_read_rom_data_command(unsigned short addr, int solution_id);
 int receive_rom_data(unsigned short *p_rom_data);
 
-// Bulk ROM Data
-int send_show_bulk_rom_data_command(unsigned short addr, unsigned short len);
+int send_show_bulk_rom_data_command(unsigned short addr);
+int receive_bulk_rom_data(unsigned short *p_rom_data);
 
 // IAP Mode
 int send_enter_iap_command(void);

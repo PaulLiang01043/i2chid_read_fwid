@@ -355,7 +355,7 @@ int send_exit_test_mode_command(void)
 int send_read_rom_data_command(unsigned short addr, int solution_id)
 {
 	int err = TP_SUCCESS;
-    unsigned char read_rom_data_cmd[6] =  {0x96, 0x00, 0x00, 0x00, 0x00, 0x11}; /* Show Bulk ROM Data Command */
+    unsigned char read_rom_data_cmd[6] =  {0x96, 0x00, 0x00, 0x00, 0x00, 0x11}; /* Read ROM Data Command */
 
 	/* Set Address & Length */
 	read_rom_data_cmd[1] = (addr & 0xFF00) >> 8;	//ADDR_H
@@ -415,16 +415,14 @@ RECEIVE_ROM_DATA_EXIT:
 }
 
 // Bulk ROM Data
-int send_show_bulk_rom_data_command(unsigned short addr, unsigned short len)
+int send_show_bulk_rom_data_command(unsigned short addr)
 {
 	int err = TP_SUCCESS;
-    unsigned char show_bulk_rom_data_cmd[6] =  {0x59, 0x10, 0x00, 0x00, 0x00, 0x00}; /* Show Bulk ROM Data Command */
+    unsigned char show_bulk_rom_data_cmd[6] =  {0x59, 0x00, 0x00, 0x00, 0x00, 0x01}; /* Show Bulk ROM Data Command (cmd[1]=0x00 in Boot Code) */
 
-	/* Set Address & Length */
+	/* Set Address */
 	show_bulk_rom_data_cmd[2] = (addr & 0xFF00) >> 8;	//ADDR_H
 	show_bulk_rom_data_cmd[3] =  addr & 0x00FF; 		//ADDR_L
-	show_bulk_rom_data_cmd[4] = (len  & 0xFF00) >> 8;	//LEN_H
-	show_bulk_rom_data_cmd[5] =  len  & 0x00FF;			//LEN_L
 
     /* Send Show Bulk ROM Data Command */
     DEBUG_PRINTF("cmd: 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x.\r\n", \
@@ -434,6 +432,39 @@ int send_show_bulk_rom_data_command(unsigned short addr, unsigned short len)
 	if (err != TP_SUCCESS)
         ERROR_PRINTF("Fail to send Show Bulk ROM Data command! errno=0x%x.\r\n", err);
 
+    return err;
+}
+
+int receive_bulk_rom_data(unsigned short *p_rom_data)
+{
+    int err = TP_SUCCESS;
+    unsigned char cmd_data[5] = {0};
+    unsigned short rom_data = 0;
+
+    err = read_data(cmd_data, sizeof(cmd_data), ELAN_READ_CALI_RESP_TIMEOUT_MSEC);
+	if(err != TP_SUCCESS) // Error or Timeout
+	{
+		ERROR_PRINTF("Fail to receive Bulk ROM data! errno=%d.\r\n", err);
+        goto RECEIVE_BULK_ROM_DATA_EXIT;
+	}
+	DEBUG_PRINTF("cmd_data: 0x%x, 0x%x, 0x%x, 0x%x, 0x%x.\r\n", cmd_data[0], cmd_data[1], cmd_data[2], cmd_data[3], cmd_data[4]);
+
+    /* Check if data invalid */
+	if (cmd_data[0] != 0x99)
+	{
+		err = TP_ERR_DATA_PATTERN;
+        ERROR_PRINTF("Bulk Data Format Invalid! errno=%d.\r\n", err);
+        goto RECEIVE_BULK_ROM_DATA_EXIT;
+	}
+
+    // Load ROM Data to Input Buffer
+    rom_data = (unsigned short)((cmd_data[3] << 8) | cmd_data[4]);
+    DEBUG_PRINTF("Bulk ROM Data: 0x%04x.\r\n", rom_data);
+
+    *p_rom_data = rom_data;
+	err = TP_SUCCESS;
+
+RECEIVE_BULK_ROM_DATA_EXIT:
     return err;
 }
 

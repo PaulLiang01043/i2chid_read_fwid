@@ -32,7 +32,7 @@
 
 // SW Version
 #ifndef ELAN_TOOL_SW_VERSION
-#define	ELAN_TOOL_SW_VERSION	"0.4"
+#define	ELAN_TOOL_SW_VERSION	"0.5"
 #endif //ELAN_TOOL_SW_VERSION
 
 // File Length
@@ -206,6 +206,22 @@ int show_fwid(system_type system, unsigned short fwid, bool quiet);
 
 int get_fwid_from_rom(unsigned short *p_fwid);
 int show_fwid_from_rom(unsigned short fwid);
+
+// Firmware Version
+int get_firmware_version(unsigned short *p_fw_version);
+
+// Solution ID
+int get_solution_id(unsigned char *p_solution_id);
+
+// ROM Data
+int get_rom_data(unsigned short addr, unsigned short *p_data, unsigned char solution_id);
+
+// Bulk ROM Data
+int get_bulk_rom_data(unsigned short addr, unsigned short *p_data);
+
+// Hello Packet
+int get_hello_packet(unsigned char *data);
+int get_hello_packet_with_error_retry(unsigned char *data, int retry_count);
 
 // Help
 void show_help_information(void);
@@ -516,6 +532,7 @@ VALIDATE_ELAN_HID_DEVICE_EXIT:
 	return err;
 }
 
+// EDID
 int get_edid_manufacturer_product_code(unsigned short *p_manufacturer_code, unsigned short *p_product_code)
 {
 	int err = TP_SUCCESS;
@@ -783,14 +800,154 @@ GET_FWID_FROM_EDID_EXIT:
 	return err;
 }
 
-int get_fwid_from_rom(unsigned short *p_fwid)
+// Firmware Version
+int get_firmware_version(unsigned short *p_fw_version)
 {
 	int err = TP_SUCCESS;
-    unsigned short fw_version = 0,
-                   fw_id = 0;
+    unsigned short fw_version = 0;
+
+    // Check if Parameter Invalid
+    if (p_fw_version == NULL)
+    {
+        ERROR_PRINTF("%s: Invalid Parameter! (p_fw_version=0x%p)\r\n", __func__, p_fw_version);
+        err = TP_ERR_INVALID_PARAM;
+        goto GET_FIRMWARE_VERSION_EXIT;
+    }
+
+    err = send_fw_version_command();
+    if(err != TP_SUCCESS)
+    {
+        ERROR_PRINTF("%s: Fail to Send FW Version Command! errno=0x%x.\r\n", __func__, err);
+        goto GET_FIRMWARE_VERSION_EXIT;
+    }
+
+    err = get_fw_version_data(&fw_version);
+    if(err != TP_SUCCESS)
+    {
+        ERROR_PRINTF("%s: Fail to Get FW Version Data! errno=0x%x.\r\n", __func__, err);
+        goto GET_FIRMWARE_VERSION_EXIT;
+    }
+
+    *p_fw_version = fw_version;
+    err = TP_SUCCESS;
+
+GET_FIRMWARE_VERSION_EXIT:
+	return err;
+}
+
+// Solution ID
+int get_solution_id(unsigned char *p_solution_id)
+{
+	int err = TP_SUCCESS;
+    unsigned short fw_version = 0;
     unsigned char  solution_id = 0;
 
+    // Check if Parameter Invalid
+    if (p_solution_id == NULL)
+    {
+        ERROR_PRINTF("%s: Invalid Parameter! (p_solution_id=0x%p)\r\n", __func__, p_solution_id);
+        err = TP_ERR_INVALID_PARAM;
+        goto GET_SOLUTION_ID_EXIT;
+    }
+
+    // Get Firmware Version
+    err = get_firmware_version(&fw_version);
+    if(err != TP_SUCCESS)
+    {
+        ERROR_PRINTF("%s: Fail to Get FW Version! errno=0x%x.\r\n", __func__, err);
+        goto GET_SOLUTION_ID_EXIT;
+    }
+
+    // Get Solution ID
+    solution_id = (unsigned char)((fw_version & 0xFF00) >> 8);
+    DEBUG_PRINTF("Solution ID: %02x.\r\n", solution_id);
+
+    *p_solution_id = solution_id;
+    err = TP_SUCCESS;
+
+GET_SOLUTION_ID_EXIT:
+	return err;
+}
+
+// ROM Data
+int get_rom_data(unsigned short addr, unsigned short *p_data, unsigned char solution_id)
+{
+	int err = TP_SUCCESS;
+    unsigned short data = 0;
+
 	// Check if Parameter Invalid
+    if (p_data == NULL)
+    {
+        ERROR_PRINTF("%s: Invalid Parameter! (p_data=0x%p)\r\n", __func__, p_data);
+        err = TP_ERR_INVALID_PARAM;
+        goto GET_ROM_DATA_EXIT;
+    }
+
+    err = send_read_rom_data_command(addr, solution_id);
+    if(err != TP_SUCCESS)
+    {
+        ERROR_PRINTF("%s: Fail to Send Read ROM Data Command (addr=0x%04x, solution_id=0x%02x)! errno=0x%x.\r\n", __func__, addr, solution_id, err);
+        goto GET_ROM_DATA_EXIT;
+    }
+
+    err = receive_rom_data(&data);
+    if(err != TP_SUCCESS)
+    {
+        ERROR_PRINTF("%s: Fail to Receive ROM Data! errno=0x%x.\r\n", __func__, err);
+        goto GET_ROM_DATA_EXIT;
+    }
+
+    *p_data = data;
+    err = TP_SUCCESS;
+
+GET_ROM_DATA_EXIT:
+	return err; 
+}
+
+// Bulk ROM Data
+int get_bulk_rom_data(unsigned short addr, unsigned short *p_data)
+{
+	int err = TP_SUCCESS;
+    unsigned short data = 0;
+
+	// Check if Parameter Invalid
+    if (p_data == NULL)
+    {
+        ERROR_PRINTF("%s: Invalid Parameter! (p_data=0x%p)\r\n", __func__, p_data);
+        err = TP_ERR_INVALID_PARAM;
+        goto GET_BULK_ROM_DATA_EXIT;
+    }
+
+    err = send_show_bulk_rom_data_command(addr);
+    if(err != TP_SUCCESS)
+    {
+        ERROR_PRINTF("%s: Fail to Send Show Bulk ROM Data Command (addr=0x%04x)! errno=0x%x.\r\n", __func__, addr, err);
+        goto GET_BULK_ROM_DATA_EXIT;
+    }
+
+    err = receive_bulk_rom_data(&data);
+    if(err != TP_SUCCESS)
+    {
+        ERROR_PRINTF("%s: Fail to Receive Bulk ROM Data! errno=0x%x.\r\n", __func__, err);
+        goto GET_BULK_ROM_DATA_EXIT;
+    }
+
+    *p_data = data;
+    err = TP_SUCCESS;
+
+GET_BULK_ROM_DATA_EXIT:
+	return err; 
+}
+
+int get_fwid_from_rom(unsigned short *p_fwid)
+{
+    int err = TP_SUCCESS;
+    bool recovery = false; // Recovery Mode
+    unsigned char hello_packet = 0,
+                  solution_id = 0;
+    unsigned short fw_id = 0;
+
+    // Check if Parameter Invalid
     if (p_fwid == NULL)
     {
         ERROR_PRINTF("%s: Invalid Parameter! (p_fwid=0x%p)\r\n", __func__, p_fwid);
@@ -798,37 +955,54 @@ int get_fwid_from_rom(unsigned short *p_fwid)
         goto GET_FWID_FROM_ROM_EXIT;
     }
 
-    /* Get Firmware Version */
-    err = send_fw_version_command();
-    if(err != TP_SUCCESS)
+    /* Check for Recovery */
+	err = get_hello_packet_with_error_retry(&hello_packet, ERROR_RETRY_COUNT);
+	if(err != TP_SUCCESS)
+	{
+		ERROR_PRINTF("Fail to Get Hello Packet! errno=0x%x.\r\n", err);
+		goto GET_FWID_FROM_ROM_EXIT;
+	}
+
+    // Check if Recovery Mode
+	if(hello_packet == ELAN_I2CHID_RECOVERY_MODE_HELLO_PACKET)
     {
-        ERROR_PRINTF("%s: Fail to Send FW Version Command! errno=0x%x.\r\n", __func__, err);
-        goto GET_FWID_FROM_ROM_EXIT;
+		printf("In Recovery Mode.\r\n");
+        recovery = true;
     }
 
-    err = get_fw_version_data(&fw_version);
-    if(err != TP_SUCCESS)
+    // Get FWID from ROM 
+    if(recovery) // Recovery Mode
+	{
+        // Read FWID from ROM (with bulk rom data command)
+        // [Note] Paul @ 20191025
+        // Since Read ROM Command only supported by main code,
+        //   we can only use Show Bulk ROM Data Command (0x59) in recovery mode (boot code stage).
+        err = get_bulk_rom_data(ELAN_INFO_ROM_FWID_MEMORY_ADDR, &fw_id);
+        if(err != TP_SUCCESS)
+        {
+            ERROR_PRINTF("%s: Fail to Get Bulk ROM Data Command! errno=0x%x.\r\n", __func__, err);
+            goto GET_FWID_FROM_ROM_EXIT;
+        }
+	}
+    else // Normal Mode
     {
-        ERROR_PRINTF("%s: Fail to Get FW Version Data! errno=0x%x.\r\n", __func__, err);
-        goto GET_FWID_FROM_ROM_EXIT;
-    }
+        // Get Solution ID
+        err = get_solution_id(&solution_id);
+        if(err != TP_SUCCESS)
+        {
+            ERROR_PRINTF("%s: Fail to Get Solution ID! errno=0x%x.\r\n", __func__, err);
+            goto GET_FWID_FROM_ROM_EXIT;
+        }
 
-    // Get Solution ID
-    solution_id = (unsigned char)((fw_version & 0xFF00) >> 8);
-
-    // Read FWID from ROM
-    err = send_read_rom_data_command(ELAN_INFO_ROM_FWID_MEMORY_ADDR, solution_id);
-    if(err != TP_SUCCESS)
-    {
-        ERROR_PRINTF("%s: Fail to Send Read ROM Data Command! errno=0x%x.\r\n", __func__, err);
-        goto GET_FWID_FROM_ROM_EXIT;
-    }
-
-    err = receive_rom_data(&fw_id);
-    if(err != TP_SUCCESS)
-    {
-        ERROR_PRINTF("%s: Fail to Receive ROM Data! errno=0x%x.\r\n", __func__, err);
-        goto GET_FWID_FROM_ROM_EXIT;
+        /* Read FWID from ROM */
+        // [Note] Paul @ 20191025
+        // In normal mode, just use Read ROM Command (0x96).
+        err = get_rom_data(ELAN_INFO_ROM_FWID_MEMORY_ADDR, &fw_id, solution_id);
+        if(err != TP_SUCCESS)
+        {
+            ERROR_PRINTF("%s: Fail to Get ROM Data! errno=0x%x.\r\n", __func__, err);
+            goto GET_FWID_FROM_ROM_EXIT;
+        }
     }
 
     *p_fwid = fw_id;
@@ -873,6 +1047,91 @@ int show_fwid(system_type system, unsigned short fwid, bool quiet)
 	}
 
 SHOW_FWID_EXIT:
+	return err;
+}
+
+// Hello Packet
+int get_hello_packet(unsigned char *data)
+{
+	int err = TP_SUCCESS;
+	unsigned char hello_packet[4] = {0};
+
+	// Make Sure Page Data Buffer Valid
+	if(data == NULL)
+	{
+		ERROR_PRINTF("%s: NULL Page Data Buffer!\r\n", __func__);
+		err = TP_ERR_INVALID_PARAM;
+		goto GET_HELLO_PACKET_EXIT;
+	}
+
+	// Send 7-bit I2C Slave Address
+	err = send_request_hello_packet_command();
+	if(err != TP_SUCCESS)
+	{
+		ERROR_PRINTF("%s: Fail to Send Request Hello Packet Command! errno=0x%x.\r\n", __func__, err);
+		goto GET_HELLO_PACKET_EXIT;
+	}
+
+	// Receive Hello Packet
+	err = read_data(hello_packet, sizeof(hello_packet), ELAN_READ_DATA_TIMEOUT_MSEC);
+	if(err == TP_ERR_TIMEOUT)
+	{
+		DEBUG_PRINTF("%s: Fail to Receive Hello Packet! Timeout!\r\n", __func__);
+		goto GET_HELLO_PACKET_EXIT;
+	}
+	if(err != TP_SUCCESS)
+	{
+		ERROR_PRINTF("%s: Fail to Receive Hello Packet! errno=0x%x.\r\n", __func__, err);
+		goto GET_HELLO_PACKET_EXIT;
+	}
+	DEBUG_PRINTF("vendor_cmd_data: %02x %02x %02x %02x.\r\n", hello_packet[0], hello_packet[1], hello_packet[2], hello_packet[3]);
+
+	// Copy first byte of Hello Packet to Input Buffer
+	*data = hello_packet[0];
+
+	// Success
+	err = TP_SUCCESS;
+
+GET_HELLO_PACKET_EXIT:
+	return err;
+}
+
+int get_hello_packet_with_error_retry(unsigned char *data, int retry_count)
+{
+	int err = TP_SUCCESS,
+		retry_index = 0;
+
+	// Make Sure Retry Count Positive
+	if(retry_count <= 0)
+		retry_count = 1;
+
+	for(retry_index = 0; retry_index < retry_count; retry_index++)
+	{
+		err = get_hello_packet(data);
+		if(err == TP_SUCCESS)
+		{
+			// Without any error => Break retry loop and continue.
+			break;
+		}
+
+		// With Error => Retry at most 3 times 
+		DEBUG_PRINTF("%s: [%d/3] Fail to Get Hello Packet! errno=0x%x.\r\n", __func__, retry_index+1, err);
+		if(retry_index == 2)
+		{
+			// Have retried for 3 times and can't fix it => Stop this function 
+			ERROR_PRINTF("%s: Fail to Get Hello Packet! errno=0x%x.\r\n", __func__, err);
+			goto GET_HELLO_PACKET_WITH_ERROR_RETRY_EXIT;
+		}
+		else // retry_index = 0, 1
+		{
+			// wait 50ms
+			usleep(50*1000); 
+
+			continue;
+		}		
+	}
+
+GET_HELLO_PACKET_WITH_ERROR_RETRY_EXIT:
 	return err;
 }
 
