@@ -966,7 +966,8 @@ int get_fwid_from_rom(unsigned short *p_fwid)
     // Check if Recovery Mode
 	if(hello_packet == ELAN_I2CHID_RECOVERY_MODE_HELLO_PACKET)
     {
-		printf("In Recovery Mode.\r\n");
+        if(g_quiet == false) // Not in Silent Mode
+		    printf("In Recovery Mode.\r\n");
         recovery = true;
     }
 
