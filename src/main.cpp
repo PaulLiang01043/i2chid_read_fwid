@@ -32,7 +32,7 @@
 
 // SW Version
 #ifndef ELAN_TOOL_SW_VERSION
-#define	ELAN_TOOL_SW_VERSION	"0.5"
+#define	ELAN_TOOL_SW_VERSION	"0.6"
 #endif //ELAN_TOOL_SW_VERSION
 
 // File Length
@@ -204,7 +204,7 @@ int show_lcm_dev_info(struct lcm_dev_info *p_dev_info, size_t dev_info_size);
 int get_fwid_from_edid(struct lcm_dev_info *p_dev_info, size_t dev_info_size, unsigned short manufacturer_code, unsigned short product_code, system_type system, unsigned short *p_fwid);
 int show_fwid(system_type system, unsigned short fwid, bool quiet);
 
-int get_fwid_from_rom(unsigned short *p_fwid);
+int get_fwid_from_rom(unsigned short *p_fwid, bool recovery);
 int show_fwid_from_rom(unsigned short fwid);
 
 // Firmware Version
@@ -939,12 +939,10 @@ GET_BULK_ROM_DATA_EXIT:
 	return err; 
 }
 
-int get_fwid_from_rom(unsigned short *p_fwid)
+int get_fwid_from_rom(unsigned short *p_fwid, bool recovery)
 {
     int err = TP_SUCCESS;
-    bool recovery = false; // Recovery Mode
-    unsigned char hello_packet = 0,
-                  solution_id = 0;
+    unsigned char solution_id = 0;
     unsigned short fw_id = 0;
 
     // Check if Parameter Invalid
@@ -953,22 +951,6 @@ int get_fwid_from_rom(unsigned short *p_fwid)
         ERROR_PRINTF("%s: Invalid Parameter! (p_fwid=0x%p)\r\n", __func__, p_fwid);
         err = TP_ERR_INVALID_PARAM;
         goto GET_FWID_FROM_ROM_EXIT;
-    }
-
-    /* Check for Recovery */
-	err = get_hello_packet_with_error_retry(&hello_packet, ERROR_RETRY_COUNT);
-	if(err != TP_SUCCESS)
-	{
-		ERROR_PRINTF("Fail to Get Hello Packet! errno=0x%x.\r\n", err);
-		goto GET_FWID_FROM_ROM_EXIT;
-	}
-
-    // Check if Recovery Mode
-	if(hello_packet == ELAN_I2CHID_RECOVERY_MODE_HELLO_PACKET)
-    {
-        if(g_quiet == false) // Not in Silent Mode
-		    printf("In Recovery Mode.\r\n");
-        recovery = true;
     }
 
     // Get FWID from ROM 
@@ -1197,11 +1179,19 @@ int open_device(void)
     // open specific device on i2c bus //pseudo function
 
     /*** example *********************/
+	if(g_pIntfGet == NULL)
+	{
+		err = TP_ERR_COMMAND_NOT_SUPPORT;
+		goto OPEN_DEVICE_EXIT;
+	}
+
     // Connect to Device
     DEBUG_PRINTF("Get I2C-HID Device Handle (VID=0x%x, PID=0x%x).\r\n", ELAN_USB_VID, g_pid);
     err = g_pIntfGet->GetDeviceHandle(ELAN_USB_VID, g_pid);
     if (err != TP_SUCCESS)
         ERROR_PRINTF("Device can't connected! errno=0x%x.\n", err);
+
+OPEN_DEVICE_EXIT:
     /*********************************/
 
     return err;
@@ -1209,13 +1199,21 @@ int open_device(void)
 
 int close_device(void)
 {
-    int err = 0;
+    int err = TP_SUCCESS;
 
     // close opened i2c device; //pseudo function
 
     /*** example *********************/
+	if(g_pIntfGet == NULL)
+    {
+		err = TP_ERR_COMMAND_NOT_SUPPORT;
+		goto CLOSE_DEVICE_EXIT;
+	}
+
     // Release acquired touch device handler
     g_pIntfGet->Close();
+
+CLOSE_DEVICE_EXIT:
     /*********************************/
 
     return err;
@@ -1509,6 +1507,8 @@ PROCESS_PARAM_EXIT:
 int main(int argc, char **argv)
 {
     int err = TP_SUCCESS;
+    bool recovery = false;
+    unsigned char hello_packet = 0;
     unsigned short fwid = 0,
                    fwid_from_rom = 0;
 
@@ -1540,13 +1540,32 @@ int main(int argc, char **argv)
         goto EXIT2;
 	}
 
-    /* Get FWID from ROM */
-    err = get_fwid_from_rom(&fwid_from_rom);
-    if (err != TP_SUCCESS)
+    /* Check for Recovery */
+	err = get_hello_packet_with_error_retry(&hello_packet, ERROR_RETRY_COUNT);
+	if(err != TP_SUCCESS)
 	{
-		ERROR_PRINTF("Fail to Get FWID from ROM! errno=0x%x.\r\n", err);
-        goto EXIT2;
+		ERROR_PRINTF("Fail to Get Hello Packet! errno=0x%x.\r\n", err);
+		goto EXIT2;
 	}
+
+    // Check if Recovery Mode
+	if(hello_packet == ELAN_I2CHID_RECOVERY_MODE_HELLO_PACKET)
+    {
+        if(g_quiet == false) // Not in Silent Mode
+		    printf("In Recovery Mode.\r\n");
+        recovery = true;
+    }
+
+    /* Get FWID from ROM if in Normal Mode */
+    if(recovery == false)
+    {
+        err = get_fwid_from_rom(&fwid_from_rom, recovery);
+        if (err != TP_SUCCESS)
+        {
+            ERROR_PRINTF("Fail to Get FWID from ROM in Normal Mode! errno=0x%x.\r\n", err);
+            goto EXIT2;
+        }
+    }
 
 	if(g_dev_info == true)
 	{
@@ -1555,7 +1574,7 @@ int main(int argc, char **argv)
 		if (err != TP_SUCCESS)
 		{
 			ERROR_PRINTF("%s: Fail to show elan HID Device! errno=0x%x.\r\n", __func__, err);
-        	goto EXIT1;
+        	goto EXIT2;
 		}
 
 		/* Show EDID Information */
@@ -1568,12 +1587,13 @@ int main(int argc, char **argv)
 			if (err != TP_SUCCESS)
 			{
 				ERROR_PRINTF("%s: Fail to show LCM Device Information! errno=0x%x.\r\n", __func__, err);
-        		goto EXIT1;
+        		goto EXIT2;
 			}
 		}
 
-        /* Show FWID from ROM */
-        show_fwid_from_rom(fwid_from_rom);
+        /* Show FWID from ROM if in Normal Mode */
+        if(recovery == false)
+            show_fwid_from_rom(fwid_from_rom);
 	}
 
 	if(g_validate_dev == true)
@@ -1583,7 +1603,7 @@ int main(int argc, char **argv)
 		if (err != TP_SUCCESS)
 		{
 			ERROR_PRINTF("%s: Fail to validate elan HID Device (PID: %04x)! errno=0x%x.\r\n", __func__, g_pid, err);
-        	goto EXIT1;
+        	goto EXIT2;
 		}
 	}
 
@@ -1593,15 +1613,29 @@ int main(int argc, char **argv)
 		err = get_fwid_from_edid(g_lcm_dev_info, sizeof(g_lcm_dev_info), g_manufacturer_code, g_product_code, g_system_type, &fwid);
 		if (err != TP_SUCCESS)
 		{
-            if (err == TP_ERR_DATA_NOT_FOUND)
+            if (err == TP_ERR_DATA_NOT_FOUND) // Can not find FWID from Mapping Table
             {
+                /* Get FWID from ROM if in Recovery Mode */
+                // [Note] Paul @ 20191218
+                // Since Show Bulk ROM Data Command (0x59) in recovery mode (boot code stage) is not supported by Boot Code with BC Ver. XX40. (but available in BC Ver. XX41),
+                //   we just acquire the FWID in Information Memory Space only if can not find FWID with Mapping Table but in Recovery Mode. 
+                if(recovery == true)
+                {
+                    err = get_fwid_from_rom(&fwid_from_rom, recovery);
+                    if (err != TP_SUCCESS)
+                    {
+                        ERROR_PRINTF("Fail to Get FWID from ROM in Recovery Mode! errno=0x%x.\r\n", err);
+                        goto EXIT2;
+                    }
+                }
+
                 DEBUG_PRINTF("fwid_from_edid Not Found, use fwid_from_rom (%x) instead.\r\n", fwid_from_rom);
                 fwid = fwid_from_rom;
             }
             else // if ((err != TP_SUCCESS) && (err != TP_ERR_DATA_NOT_FOUND))
             {
 			    ERROR_PRINTF("%s: Fail to get %s FWID! errno=0x%x.\r\n", __func__, (g_system_type == CHROME) ? "chrome" : "windows", err);
-        	    goto EXIT1;
+        	    goto EXIT2;
             }
 		}
 
@@ -1610,7 +1644,7 @@ int main(int argc, char **argv)
 		if (err != TP_SUCCESS)
 		{
 			ERROR_PRINTF("%s: Fail to show %s FWID! errno=0x%x.\r\n", __func__, (g_system_type == CHROME) ? "chrome" : "windows", err);
-        	goto EXIT1;
+        	goto EXIT2;
 		}
 	}
 
