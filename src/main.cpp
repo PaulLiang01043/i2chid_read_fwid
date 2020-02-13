@@ -32,7 +32,7 @@
 
 // SW Version
 #ifndef ELAN_TOOL_SW_VERSION
-#define	ELAN_TOOL_SW_VERSION	"0.6"
+#define	ELAN_TOOL_SW_VERSION	"0.7"
 #endif //ELAN_TOOL_SW_VERSION
 
 // File Length
@@ -85,7 +85,7 @@
 #endif //AUO_EDID_HEADER
 
 #ifndef BOE_EDID_HEADER
-#define BOE_EDID_HEADER             "59700200b0042205"
+#define BOE_EDID_HEADER             "ac700200b0040005"
 #endif //BOE_EDID_HEADER
 
 // System Name Length
