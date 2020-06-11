@@ -135,6 +135,13 @@ const int SOLUTION_ID_EKTH6315to3915P = 0x15;
 //6308
 const int SOLUTION_ID_EKTH6308x1	= 0x63;
 
+//7315
+const int SOLUTION_ID_EKTH7315x1	= 0x64;
+const int SOLUTION_ID_EKTH7315x2	= 0x65;
+
+//7318
+const int SOLUTION_ID_EKTH7318x1	= 0x67;
+
 /*******************************************
  * Global Data Structure Declaration
  ******************************************/

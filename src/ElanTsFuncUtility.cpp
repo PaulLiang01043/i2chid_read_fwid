@@ -362,11 +362,16 @@ int send_read_rom_data_command(unsigned short addr, int solution_id)
 	read_rom_data_cmd[2] =  addr & 0x00FF; 		    //ADDR_L
 
     // Information Command Parameter
-    if ((solution_id == SOLUTION_ID_EKTH6315x1) || \
+    if (/* 63XX Solution */
+        (solution_id == SOLUTION_ID_EKTH6315x1) || \
         (solution_id == SOLUTION_ID_EKTH6315x2) || \
         (solution_id == SOLUTION_ID_EKTH6315to5015M) || \
-        (solution_id == SOLUTION_ID_EKTH6315to3915P)) // 63XX Solution
-        read_rom_data_cmd[5] = 0x21; // 63XX: byte[5]=0x21 => Read Information
+        (solution_id == SOLUTION_ID_EKTH6315to3915P) || \
+        /* 73XX Solution */
+        (solution_id == SOLUTION_ID_EKTH7315x1) || \
+        (solution_id == SOLUTION_ID_EKTH7315x2) || \
+        (solution_id == SOLUTION_ID_EKTH7318x1))
+        read_rom_data_cmd[5] = 0x21; // 63XX or 73XX: byte[5]=0x21 => Read Information
     else
         read_rom_data_cmd[5] = 0x11; // 53XX: byte[5]=0x11 => Read Information
 
