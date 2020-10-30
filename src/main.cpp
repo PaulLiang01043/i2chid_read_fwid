@@ -32,7 +32,7 @@
 
 // SW Version
 #ifndef ELAN_TOOL_SW_VERSION
-#define	ELAN_TOOL_SW_VERSION	"0.8"
+#define	ELAN_TOOL_SW_VERSION	"0.9"
 #endif //ELAN_TOOL_SW_VERSION
 
 // File Length
@@ -155,6 +155,7 @@ FILE *g_fd_fwid_mapping_file = NULL;
 bool g_dev_info = false;
 
 // EDID Information
+bool g_edid_info_found = true;
 unsigned short g_manufacturer_code = 0,
 			   g_product_code = 0;
 
@@ -542,6 +543,7 @@ int get_edid_manufacturer_product_code(unsigned short *p_manufacturer_code, unsi
 		 *p_edid_product_code = NULL;
 	char edid_manufacturer_code[5] = {0},
 		 edid_product_code[5] = {0};
+	bool edid_header_found = false;
 	FILE *fd_process_pipe;
 
 	// Check if Parameter Invalid
@@ -561,7 +563,7 @@ int get_edid_manufacturer_product_code(unsigned short *p_manufacturer_code, unsi
 		goto GET_EDID_MANUFACTURER_PRODUCT_CODE_EXIT;
 	}
 
-	/* Read the output a line at a time and parse it */
+	/* Read the output line by line */
 	while (fgets(buf, sizeof(buf)-1, fd_process_pipe) != NULL) 
 	{
 		//DEBUG_PRINTF("%s", buf);
@@ -570,43 +572,63 @@ int get_edid_manufacturer_product_code(unsigned short *p_manufacturer_code, unsi
 
         // Pattern 1: Standard EDID Header
 		p_edid_header = strstr(buf, STANDARD_EDID_HEADER);
-		if(p_edid_header == NULL)
+		if(p_edid_header != NULL)
         {
-            // Pattern 2: AUO EDID Header
-            p_edid_header = strstr(buf, AUO_EDID_HEADER);
-            if(p_edid_header == NULL)
-            {
-                // Pattern 3: BOE EDID Header
-                p_edid_header = strstr(buf, BOE_EDID_HEADER);
-                if(p_edid_header == NULL)
-                {
-                    // Not contain of known EDID Header, try to search next line
-                    continue;
-                }
-            }
-        }
+			DEBUG_PRINTF("%s: Standard EDID header found!\r\n", __func__);
+			edid_header_found = true;
+			break;
+		}
 
-		// Line output with EDID Header 
-		DEBUG_PRINTF("%s: %s", __func__, buf);
+        // Pattern 2: AUO EDID Header
+		p_edid_header = strstr(buf, AUO_EDID_HEADER);
+		if(p_edid_header != NULL)
+		{
+			DEBUG_PRINTF("%s: AUO EDID header found!\r\n", __func__);
+			edid_header_found = true;
+			break;
+		}
 
-		// Manufacturer Code
-		p_edid_manufacturer_code = p_edid_header + strlen(STANDARD_EDID_HEADER);
-		strncpy(edid_manufacturer_code, p_edid_manufacturer_code, 4);
-		*p_manufacturer_code = strtol(edid_manufacturer_code, NULL, 16);
-		DEBUG_PRINTF("%s: manufacturer_code: %04x.\r\n", __func__, *p_manufacturer_code);
+		// Pattern 3: BOE EDID Header
+		p_edid_header = strstr(buf, BOE_EDID_HEADER);
+		if(p_edid_header != NULL)
+		{
+			DEBUG_PRINTF("%s: AUO EDID header found!\r\n", __func__);
+			edid_header_found = true;
+			break;
+		}
 
-		// Product Code
-		p_edid_product_code = p_edid_manufacturer_code + 4;
-		strncpy(edid_product_code, p_edid_product_code, 4);
-		*p_product_code = strtol(edid_product_code, NULL, 16);
-		DEBUG_PRINTF("%s: product_code: %04x.\r\n", __func__, *p_product_code);
-
-		// Job done, break the loop
-		break;
+		// If no known EDID headers found, continue to search next line.  
+		if(edid_header_found == false)
+			continue;
 	}
 
 	/* close */
 	pclose(fd_process_pipe);
+
+	DEBUG_PRINTF("%s: EDID Header Found? %s.\r\n", __func__, (edid_header_found) ? "true" : "false");
+	if(edid_header_found == false)
+	{
+		// Terminate the process and return error code
+		err = TP_ERR_DATA_NOT_FOUND;
+		goto GET_EDID_MANUFACTURER_PRODUCT_CODE_EXIT;
+	}
+
+	/* Parse found EDID information */
+
+	// Line output with EDID Header 
+	DEBUG_PRINTF("%s: %s", __func__, buf);
+
+	// Manufacturer Code
+	p_edid_manufacturer_code = p_edid_header + strlen(STANDARD_EDID_HEADER);
+	strncpy(edid_manufacturer_code, p_edid_manufacturer_code, 4);
+	*p_manufacturer_code = strtol(edid_manufacturer_code, NULL, 16);
+	DEBUG_PRINTF("%s: manufacturer_code: %04x.\r\n", __func__, *p_manufacturer_code);
+
+	// Product Code
+	p_edid_product_code = p_edid_manufacturer_code + 4;
+	strncpy(edid_product_code, p_edid_product_code, 4);
+	*p_product_code = strtol(edid_product_code, NULL, 16);
+	DEBUG_PRINTF("%s: product_code: %04x.\r\n", __func__, *p_product_code);
 
 	// Success
 	err = TP_SUCCESS;
@@ -743,7 +765,7 @@ int get_fwid_from_edid(struct lcm_dev_info *p_dev_info, size_t dev_info_size, un
 	// Check if Parameter Invalid
     if ((p_dev_info == NULL) || (dev_info_size == 0) || (manufacturer_code == 0) || (product_code == 0) || (system == UNKNOWN) || (p_fwid == NULL))
     {
-        ERROR_PRINTF("%s: Invalid Parameter! (p_dev_info=0x%p, dev_info_size=%zd, manufacturer_code=0x%x, product_code=0x%x, system=%d, p_fwid=0x%p)\r\n",
+        ERROR_PRINTF("%s: Invalid Parameter! (p_dev_info=0x%p, dev_info_size=%zd, manufacturer_code=0x%x, product_code=0x%x, system=%d, p_fwid=0x%p)\r\n", \
 							__func__, p_dev_info, dev_info_size, manufacturer_code, product_code, system, p_fwid);
         err = TP_ERR_INVALID_PARAM;
         goto GET_FWID_FROM_EDID_EXIT;
@@ -760,7 +782,8 @@ int get_fwid_from_edid(struct lcm_dev_info *p_dev_info, size_t dev_info_size, un
 		if(strcmp(p_dev_info[index].panel_info, "") == 0)
 			continue;
 
-		DEBUG_PRINTF("%s: [%d] panel_info: \"%s\", chrome_fwid: %04x, windows_fwid: %04x.\r\n", __func__, index, p_dev_info[index].panel_info, p_dev_info[index].chrome_fwid, p_dev_info[index].windows_fwid);
+		DEBUG_PRINTF("%s: [%d] panel_info: \"%s\", chrome_fwid: %04x, windows_fwid: %04x.\r\n", \
+						__func__, index, p_dev_info[index].panel_info, p_dev_info[index].chrome_fwid, p_dev_info[index].windows_fwid);
 		if(strcmp(p_dev_info[index].panel_info, target_panel_info) == 0)
 		{
 			if(system == CHROME)
@@ -1253,8 +1276,20 @@ int resource_init(void)
 	err = get_edid_manufacturer_product_code(&g_manufacturer_code, &g_product_code);
 	if (err != TP_SUCCESS)
 	{
-		ERROR_PRINTF("%s: Fail to get EDID manufacturer code & product code ! errno=0x%x.\r\n", __func__, err);
-		goto RESOURCE_INIT_EXIT;
+		//ERROR_PRINTF("%s: Fail to get EDID manufacturer code & product code ! errno=0x%x.\r\n", __func__, err);
+		if(err == TP_ERR_DATA_NOT_FOUND)
+		{
+			/* Set Flag for EDID Info. Not Found */
+
+			// [Note] 2020/10/27
+			// Since EDID information of BOE NV133FHM-N62 V8.1 can not be read by modetest command (used in Acer Karben project),
+			// we add a new flag an flow to avoid process terminated by edid information read fail.
+			g_edid_info_found = false;
+		}
+		else // Other
+		{
+			goto RESOURCE_INIT_EXIT;
+		}
 	}
 
 	// Initialize LCM Device Information & FWID Mapping Table
@@ -1578,7 +1613,14 @@ int main(int argc, char **argv)
 		}
 
 		/* Show EDID Information */
-		show_edid_manufacturer_product_code(g_manufacturer_code, g_product_code);
+		if(g_edid_info_found == true) // EDID Info. Found
+		{
+			show_edid_manufacturer_product_code(g_manufacturer_code, g_product_code);
+		}
+		else // EDID Info. Not Found
+		{
+			ERROR_PRINTF("%s: EDID Info. Not Found!\r\n", __func__);
+		}
 		
 		if(g_lookup_fwid == true)
 		{
@@ -1609,34 +1651,53 @@ int main(int argc, char **argv)
 
 	if(g_lookup_fwid == true)
 	{
-		/* Lookup FWID from EDID */
-		err = get_fwid_from_edid(g_lcm_dev_info, sizeof(g_lcm_dev_info), g_manufacturer_code, g_product_code, g_system_type, &fwid);
-		if (err != TP_SUCCESS)
+		if(g_edid_info_found == true) // EDID Info. Found
 		{
-            if (err == TP_ERR_DATA_NOT_FOUND) // Can not find FWID from Mapping Table
-            {
-                /* Get FWID from ROM if in Recovery Mode */
-                // [Note] Paul @ 20191218
-                // Since Show Bulk ROM Data Command (0x59) in recovery mode (boot code stage) is not supported by Boot Code with BC Ver. XX40. (but available in BC Ver. XX41),
-                //   we just acquire the FWID in Information Memory Space only if can not find FWID with Mapping Table but in Recovery Mode. 
-                if(recovery == true)
-                {
-                    err = get_fwid_from_rom(&fwid_from_rom, recovery);
-                    if (err != TP_SUCCESS)
-                    {
-                        ERROR_PRINTF("Fail to Get FWID from ROM in Recovery Mode! errno=0x%x.\r\n", err);
-                        goto EXIT2;
-                    }
-                }
+			/* Lookup FWID from EDID */
+			err = get_fwid_from_edid(g_lcm_dev_info, sizeof(g_lcm_dev_info), g_manufacturer_code, g_product_code, g_system_type, &fwid);
+			if (err != TP_SUCCESS)
+			{
+            	if (err == TP_ERR_DATA_NOT_FOUND) // Can not find FWID from Mapping Table
+            	{
+                	/* Get FWID from ROM if in Recovery Mode */
+                	// [Note] Paul @ 20191218
+                	// Since Show Bulk ROM Data Command (0x59) in recovery mode (boot code stage) is not supported by Boot Code with BC Ver. XX40. (but available in BC Ver. XX41),
+                	//   we just acquire the FWID in Information Memory Space only if can not find FWID with Mapping Table but in Recovery Mode. 
+                	if(recovery == true)
+                	{
+                    	err = get_fwid_from_rom(&fwid_from_rom, recovery);
+                    	if (err != TP_SUCCESS)
+                    	{
+                        	ERROR_PRINTF("Fail to Get FWID from ROM in Recovery Mode! errno=0x%x.\r\n", err);
+                        	goto EXIT2;
+                    	}
+                	}
 
-                DEBUG_PRINTF("fwid_from_edid Not Found, use fwid_from_rom (%x) instead.\r\n", fwid_from_rom);
-                fwid = fwid_from_rom;
-            }
-            else // if ((err != TP_SUCCESS) && (err != TP_ERR_DATA_NOT_FOUND))
-            {
-			    ERROR_PRINTF("%s: Fail to get %s FWID! errno=0x%x.\r\n", __func__, (g_system_type == CHROME) ? "chrome" : "windows", err);
-        	    goto EXIT2;
-            }
+                	DEBUG_PRINTF("fwid_from_edid Not Found, use fwid_from_rom (%x) instead.\r\n", fwid_from_rom);
+                	fwid = fwid_from_rom;
+            	}
+            	else // if ((err != TP_SUCCESS) && (err != TP_ERR_DATA_NOT_FOUND))
+            	{
+			    	ERROR_PRINTF("%s: Fail to get %s FWID! errno=0x%x.\r\n", __func__, (g_system_type == CHROME) ? "chrome" : "windows", err);
+        	    	goto EXIT2;
+            	}
+			}
+		}
+		else // EDID Info. Not Found
+		{
+			/* Get FWID from ROM */
+			// [Note] 2020/10/27
+		 	// Since EDID information of BOE NV133FHM-N62 V8.1 can not be read by modetest command (used in Acer Karben project),
+		 	// a new behavior is added: Just read FWID from ROM if EDID read failed.
+			err = get_fwid_from_rom(&fwid_from_rom, recovery);
+			if (err != TP_SUCCESS)
+			{
+				ERROR_PRINTF("Fail to Get FWID from ROM! errno=0x%x.\r\n", err);
+				goto EXIT2;
+			}
+
+			DEBUG_PRINTF("EDID read failed, use fwid_from_rom (%x) instead.\r\n", fwid_from_rom);
+            fwid = fwid_from_rom;
 		}
 
 		/* Show FWID */

@@ -67,7 +67,7 @@ int read_fw_id_data(void)
         ERROR_PRINTF("Fail to read FW ID data, errno=0x%x.\n", err);
         goto READ_FW_ID_DATA_EXIT;
     }
-    DEBUG_PRINTF("cmd_data: 0x%x, 0x%x, 0x%x, 0x%x.\r\n", cmd_data[0], cmd_data[1], cmd_data[2], cmd_data[3]);
+    DEBUG_PRINTF("cmd_data: 0x%02x, 0x%02x, 0x%02x, 0x%02x.\r\n", cmd_data[0], cmd_data[1], cmd_data[2], cmd_data[3]);
 
     /* Check if Data is Firmware ID */
     if ((cmd_data[0] == 0x52) && (((cmd_data[1] & 0xf0) >> 4) == 0xf))
@@ -204,7 +204,7 @@ int read_test_version_data(void)
         ERROR_PRINTF("Fail to receive Test Version data, errno=0x%x.\r\n", err);
         goto READ_TEST_VERSION_DATA_EXIT;
     }
-    DEBUG_PRINTF("cmd_data: 0x%x, 0x%x, 0x%x, 0x%x.\r\n", cmd_data[0], cmd_data[1], cmd_data[2], cmd_data[3]);
+    DEBUG_PRINTF("cmd_data: 0x%02x, 0x%02x, 0x%02x, 0x%02x.\r\n", cmd_data[0], cmd_data[1], cmd_data[2], cmd_data[3]);
 
     /* Check if Data is for Test Version */
     if ((cmd_data[0] == 0x52) && (((cmd_data[1] & 0xf0) >> 4) == 0xe))
@@ -248,7 +248,7 @@ int read_boot_code_version_data(void)
         ERROR_PRINTF("Fail to read Boot Code Version data, errno=0x%x.\r\n", err);
         goto READ_BOOT_CODE_VERSION_DATA_EXIT;
     }
-    DEBUG_PRINTF("cmd_data: 0x%x, 0x%x, 0x%x, 0x%x.\r\n", cmd_data[0], cmd_data[1], cmd_data[2], cmd_data[3]);
+    DEBUG_PRINTF("cmd_data: 0x%02x, 0x%02x, 0x%02x, 0x%02x.\r\n", cmd_data[0], cmd_data[1], cmd_data[2], cmd_data[3]);
 
     /* Check if Data is Boot Code Version */
     if ((cmd_data[0] == 0x52) && (((cmd_data[1] & 0xf0) >> 4) == 0x1))
@@ -306,7 +306,7 @@ int receive_rek_response(void)
 		ERROR_PRINTF("Re-Calibration failed! errno=%d.\r\n", err);
         goto RECEIVE_REK_RESPONSE_EXIT;
 	}
-	DEBUG_PRINTF("cmd_data: 0x%x, 0x%x, 0x%x, 0x%x.\r\n", cmd_data[0], cmd_data[1], cmd_data[2], cmd_data[3]);
+	DEBUG_PRINTF("cmd_data: 0x%02x, 0x%02x, 0x%02x, 0x%02x.\r\n", cmd_data[0], cmd_data[1], cmd_data[2], cmd_data[3]);
 
 	/* Check if Correct Response */
 	if((cmd_data[0]==0x66) && (cmd_data[1]==0x66) && (cmd_data[2]==0x66) && (cmd_data[3]==0x66)) // Calibrated
@@ -398,7 +398,7 @@ int receive_rom_data(unsigned short *p_rom_data)
 		ERROR_PRINTF("Fail to receive ROM data! errno=%d.\r\n", err);
         goto RECEIVE_ROM_DATA_EXIT;
 	}
-	DEBUG_PRINTF("cmd_data: 0x%x, 0x%x, 0x%x, 0x%x, 0x%x, 0x%x.\r\n", cmd_data[0], cmd_data[1], cmd_data[2], cmd_data[3], cmd_data[4], cmd_data[5]);
+	DEBUG_PRINTF("cmd_data: 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x.\r\n", cmd_data[0], cmd_data[1], cmd_data[2], cmd_data[3], cmd_data[4], cmd_data[5]);
 
     /* Check if data invalid */
 	if (cmd_data[0] != 0x95)
@@ -452,7 +452,7 @@ int receive_bulk_rom_data(unsigned short *p_rom_data)
 		ERROR_PRINTF("Fail to receive Bulk ROM data! errno=%d.\r\n", err);
         goto RECEIVE_BULK_ROM_DATA_EXIT;
 	}
-	DEBUG_PRINTF("cmd_data: 0x%x, 0x%x, 0x%x, 0x%x, 0x%x.\r\n", cmd_data[0], cmd_data[1], cmd_data[2], cmd_data[3], cmd_data[4]);
+	DEBUG_PRINTF("cmd_data: 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x.\r\n", cmd_data[0], cmd_data[1], cmd_data[2], cmd_data[3], cmd_data[4]);
 
     /* Check if data invalid */
 	if (cmd_data[0] != 0x99)
