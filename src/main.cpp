@@ -32,7 +32,7 @@
 
 // SW Version
 #ifndef ELAN_TOOL_SW_VERSION
-#define	ELAN_TOOL_SW_VERSION	"0.9"
+#define	ELAN_TOOL_SW_VERSION	"0.a"
 #endif //ELAN_TOOL_SW_VERSION
 
 // File Length
@@ -72,7 +72,7 @@
 
 // Path of modetest command
 #ifndef MODETEST_CMD
-#define MODETEST_CMD	"/usr/bin/modetest"
+#define MODETEST_CMD	"/usr/bin/modetest -a"
 #endif //MODETEST_CMD
 
 // EDID Header
@@ -592,7 +592,7 @@ int get_edid_manufacturer_product_code(unsigned short *p_manufacturer_code, unsi
 		p_edid_header = strstr(buf, BOE_EDID_HEADER);
 		if(p_edid_header != NULL)
 		{
-			DEBUG_PRINTF("%s: AUO EDID header found!\r\n", __func__);
+			DEBUG_PRINTF("%s: BOE EDID header found!\r\n", __func__);
 			edid_header_found = true;
 			break;
 		}
