@@ -684,7 +684,7 @@ int CI2CHIDLinuxGet::FindHidrawDevice(int nVID, int nPID, char *pszDevicePath)
         nError = open(szFile, O_RDWR | O_NONBLOCK);
         if (nError < 0)
         {
-            DBG("%s: Fail to Open Device %s! errno=%d.", pDirEntry->d_name, nError);
+            DBG("%s: Fail to Open Device %s! errno=%d.", __func__, pDirEntry->d_name, nError);
             continue;
         }
         nFd = nError;
