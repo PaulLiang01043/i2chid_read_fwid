@@ -52,6 +52,11 @@
 #define TP_ERR_IO_ERROR						0x0009
 #endif // TP_ERR_IO_ERROR
 
+/** Value(s) mismatched for some cases **/
+#ifndef TP_ERR_DATA_MISMATCHED
+#define TP_ERR_DATA_MISMATCHED				0x000A
+#endif //TP_ERR_DATA_MISMATCHED
+
 /** Connect Elan Bridge and not get hello packet **/
 #ifndef TP_ERR_CONNECT_NO_HELLO_PACKET
 #define TP_ERR_CONNECT_NO_HELLO_PACKET		0x0102
@@ -71,6 +76,11 @@
 #ifndef TP_ERR_DATA_NOT_FOUND
 #define TP_ERR_DATA_NOT_FOUND				0x0106
 #endif //TP_ERR_FILE_NOT_FOUND
+
+/** File I/O Error  **/
+#ifndef TP_ERR_FILE_IO_ERROR
+#define TP_ERR_FILE_IO_ERROR				0x0107
+#endif //TP_ERR_FILE_IO_ERROR
 
 /* Unknown Device Type */
 #ifndef TP_UNKNOWN_DEVICE_TYPE
