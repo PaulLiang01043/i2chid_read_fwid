@@ -27,12 +27,12 @@
 
 // SW Version
 #ifndef ELAN_TOOL_SW_VERSION
-#define	ELAN_TOOL_SW_VERSION 	"1.0"
+#define	ELAN_TOOL_SW_VERSION 	"1.1"
 #endif //ELAN_TOOL_SW_VERSION
 
 // SW Release Date
 #ifndef ELAN_TOOL_SW_RELEASE_DATE
-#define ELAN_TOOL_SW_RELEASE_DATE	"2022-08-12"
+#define ELAN_TOOL_SW_RELEASE_DATE	"2022-10-28"
 #endif //ELAN_TOOL_SW_RELEASE_DATE
 
 // Error Retry Count
@@ -913,7 +913,8 @@ int main(int argc, char **argv)
     // Check if Recovery Mode
     if(recovery == true)
     {
-        printf("In Recovery Mode.\r\n");
+        if(g_silent_mode == false) // Not in Silent Mode
+            printf("In Recovery Mode.\r\n");
     }
 
     /* Get System Info. */
